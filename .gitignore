@@ -1,0 +1,57 @@
+# Virtual Environment
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Python Bytecode
+__pycache__/
+*.py[cod]
+
+# Distribution / Packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Pytest cache
+.cache
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# VS Code settings
+.vscode/
+
+# PyCharm settings
+.idea/
+
+# Other
+*.log
+*.sqlite3
+*.db
+*.DS_Store
+
+
+demo.ipynb
+tasnim\tasnim.csv
+tasnim/tasnim.csv
