@@ -1,56 +1,62 @@
-import scrapy
+import requests
+from bs4 import BeautifulSoup
+import csv
+import time
 
-class TasnimSpider(scrapy.Spider):
-    
-    main_url = "https://www.tasnimnews.com"
-    name = "Tasnim"
-    base_urls=['https://www.tasnimnews.com/fa/service/1/', #سیاسی,
-                'https://www.tasnimnews.com/fa/service/2/', #اجتماعی,
-                'https://www.tasnimnews.com/fa/service/3/', #ورزشی,
-                'https://www.tasnimnews.com/fa/service/4/', #فرهنگی هنری,
-                'https://www.tasnimnews.com/fa/service/6/', #استان‌ها,
-                'https://www.tasnimnews.com/fa/service/7/', #اقتصادی,
-                'https://www.tasnimnews.com/fa/service/8/', #بین الملل,
-                'https://www.tasnimnews.com/fa/service/9/', #رسانه ها,
-                 ]
+# =============================
+# ⚙️ تنظیمات
+START_PAGE = 36001    # صفحه شروع
+END_PAGE = 50000  # صفحه پایان
+PAGES_PER_FILE = 500
+BASE_URL = "https://rojnews.news/?p={}"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
+# =============================
 
-    number_of_pages=400
-    def __init__(self):
-        pages = [f"?page={i}" for i in range(1,self.number_of_pages)]
-        self.start_urls = []
-        for item in self.base_urls:
-            for page in pages:
-                self.start_urls.append(f"{item}{page}")
+def scrape_page(page_id):
+    url = BASE_URL.format(page_id)
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        if response.status_code != 200:
+            return {"URL": url, "Title": "", "Body": "", "Time and Date": ""}
 
-    def parse(self, response ):
-        categories = {'https://www.tasnimnews.com/fa/service/1/':'سیاسی',
-                    'https://www.tasnimnews.com/fa/service/2/':'اجتماعی',
-                    'https://www.tasnimnews.com/fa/service/3/':'ورزشی',
-                    'https://www.tasnimnews.com/fa/service/4/':'فرهنگی هنری',
-                    'https://www.tasnimnews.com/fa/service/6/':'استان‌ها',
-                    'https://www.tasnimnews.com/fa/service/7/':'اقتصادی',
-                    'https://www.tasnimnews.com/fa/service/8/':'بین الملل',
-                    'https://www.tasnimnews.com/fa/service/9/':'رسانه ها',}
-        
-        for item in categories.keys():
-            if response.url.startswith(item):
-                category = categories[item]
+        soup = BeautifulSoup(response.text, "html.parser")
 
-        for news in response.css('article.list-item a::attr(href)').getall():
-            request=scrapy.Request(
-                self.main_url+news, 
-                callback=self.parse_news,
-                cb_kwargs=dict(category=category))
-            yield request 
+        title = soup.select_one("span[itemprop='headline']")
+        body = soup.select_one("article")
+        datetime = soup.select_one(".post-published b")
 
-
-    def parse_news(self, response,category):
-        item = {
-            'category': category,
-            'title': response.css('article.single-news h1.title::text').get(),
-            'abstract': response.css('article.single-news h3.lead::text').get(),
-            'body': ' '.join(response.css('article.single-news div.story p::text').getall()),
-            'time': response.css('article.single-news div._sticky ul.list-inline li.time::text').get()
+        return {
+            "URL": url,
+            "Title": title.get_text(strip=True) if title else "",
+            "Body": body.get_text(strip=True) if body else "",
+            "Time and Date": datetime.get_text(strip=True) if datetime else ""
         }
-        
-        yield item
+    except Exception as e:
+        print(f"❌ Error on page {page_id}: {e}")
+        return {"URL": url, "Title": "", "Body": "", "Time and Date": ""}
+
+def main():
+    all_data = []
+    file_index = 73
+    for i, page_id in enumerate(range(START_PAGE, END_PAGE + 1), start=1):
+        print(f"📄 Scraping page: {page_id}")
+        data = scrape_page(page_id)
+        all_data.append(data)
+
+        # ذخیره هر ۵۰۰ صفحه یا پایان کار
+        if i % PAGES_PER_FILE == 0 or page_id == END_PAGE:
+            filename = f"rojnews_{file_index}.csv"
+            with open(filename, "w", encoding="utf-8-sig", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["URL", "Title", "Body", "Time and Date"])
+                writer.writeheader()
+                writer.writerows(all_data)
+            print(f"✅ Saved {len(all_data)} records to {filename}")
+            all_data = []
+            file_index += 1
+
+        time.sleep(1)  # برای کاهش فشار روی سرور
+
+if __name__ == "__main__":
+    main()
